@@ -1,0 +1,14 @@
+database:
+  username: 'tenacity'
+  password: 'tenacity'
+  host: 'localhost'
+  port: 3306
+  name: 'tenacity'
+  # url: 'jdbc:mysql://tenacity:tenacity@127.0.0.1:3306/tenacity'
+saving:
+  health: true
+  experience: true
+  food: true
+  effects: true
+  recipeBook: true
+  inventory: true

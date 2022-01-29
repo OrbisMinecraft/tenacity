@@ -1,0 +1,6 @@
+name: Tenacity
+version: '${version}'
+main: net.orbismc.tenacity.Tenacity
+api-version: 1.18
+prefix: Tenacity
+description: A Paper plugin for sharing player data accross servers.
