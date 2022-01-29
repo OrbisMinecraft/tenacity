@@ -4,11 +4,28 @@ database:
   host: 'localhost'
   port: 3306
   name: 'tenacity'
-  # url: 'jdbc:mysql://tenacity:tenacity@127.0.0.1:3306/tenacity'
+
+  # If you'd like to copy-paste a URL, you can do that too.
+  # url: 'jdbc:mysql://127.0.0.1:3306/tenacity?user=tenacity&password=tenacity'
 saving:
+  # Setting health to true will cause the player's health, on fire state, remaining air,
+  # absorption hearts and the glowing effect to persist across servers.
   health: true
+
+  # Setting experience to true will cause the player's total experience points, and current
+  # experience level to persist across servers.
   experience: true
+
+  # Setting food to true will cause the player's food level, exhaustion and saturation
+  # to persist across servers.
   food: true
+
+  # Setting effects to true will cause the player's potion effects to persist across servers.
   effects: true
+
+  # Setting recipeBook to true will cause the player's recipe book to persist across servers.
   recipeBook: true
+
+  # Setting inventory to true will cause the player's inventory, armor and ender-chest to
+  # persist across servers.
   inventory: true
