@@ -12,6 +12,9 @@ import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.jetbrains.annotations.NotNull;
 
+/**
+ * The main event lister for <i>tenacity</i>.
+ */
 public final class TenacityEventListener implements Listener {
 	private final Tenacity plugin;
 
@@ -19,6 +22,10 @@ public final class TenacityEventListener implements Listener {
 		this.plugin = plugin;
 	}
 
+	/**
+	 * Handles a player joining the world. This will load the player data from the database.
+	 * @param event The event to handle.
+	 */
 	@EventHandler(ignoreCancelled = true, priority = EventPriority.HIGHEST)
 	public void onPlayerJoin(final @NotNull PlayerJoinEvent event) {
 		final var player = event.getPlayer();
@@ -37,6 +44,10 @@ public final class TenacityEventListener implements Listener {
 		});
 	}
 
+	/**
+	 * Handles a player leaving the world. This will save the player data to the database.
+	 * @param event The event to handle.
+	 */
 	@EventHandler(ignoreCancelled = true, priority = EventPriority.HIGHEST)
 	public void onPlayerQuit(final @NotNull PlayerQuitEvent event) {
 		final var player = event.getPlayer();

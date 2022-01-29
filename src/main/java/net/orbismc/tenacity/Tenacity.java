@@ -4,7 +4,7 @@
  */
 package net.orbismc.tenacity;
 
-import net.orbismc.tenacity.util.DatabaseAccessor;
+import net.orbismc.tenacity.util.DatabaseAction;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.jetbrains.annotations.NotNull;
 import org.mariadb.jdbc.MariaDbPoolDataSource;
@@ -18,7 +18,7 @@ import java.util.Objects;
 
 public final class Tenacity extends JavaPlugin {
 	public TenacityConfig config;
-	private MariaDbPoolDataSource database;
+	private MariaDbPoolDataSource pool;
 
 	@Override
 	public void onEnable() {
@@ -31,7 +31,7 @@ public final class Tenacity extends JavaPlugin {
 			throw new IllegalStateException("Failed to load configuration", e);
 		}
 
-		this.database = new MariaDbPoolDataSource(config.database.url != null ? config.database.url :
+		this.pool = new MariaDbPoolDataSource(config.database.url != null ? config.database.url :
 				    "jdbc:mariadb://%s:%d/%s?user=%s&password=%s&maxPoolSize=3".formatted(
 				config.database.host,
 				config.database.port,
@@ -43,31 +43,35 @@ public final class Tenacity extends JavaPlugin {
 		// Run the database setup
 		try {
 			final var resource = Objects.requireNonNull(getResource("setup.sql"));
-			final var content = new byte[resource.available()];
-			resource.read(content);
-
+			final var content = resource.readAllBytes();
 			withDatabase(conn -> conn.createStatement().execute(new String(content, StandardCharsets.UTF_8)));
 		} catch (IOException e) {
-			e.printStackTrace();
+			getLogger().severe("Failed to set up the database %s".formatted(e));
 		}
 
 		this.getServer().getPluginManager().registerEvents(new TenacityEventListener(this), this);
 	}
 
-	public void withDatabase(final @NotNull DatabaseAccessor accessor) {
-		try (final var conn = database.getConnection()) {
+	/**
+	 * Runs some action inside the database.
+	 * @param action The action to perform
+	 */
+	public void withDatabase(final @NotNull DatabaseAction action) {
+		try (final var conn = pool.getConnection()) {
 			try {
-				accessor.handle(conn);
-			} catch (Exception e) {
+				action.perform(conn);
+			} catch (final SQLException e) {
 				getLogger().severe("Database access failed: %s".formatted(e));
 			}
-		} catch (SQLException e) {
-			getLogger().severe("Failed to establish a connection to the database at %s: %s".formatted(config.database.url != null ? config.database.url : config.database.host, e));
+		} catch (final SQLException e) {
+			getLogger().severe("Failed to establish a connection to the database at %s: %s".formatted(
+					config.database.url != null ? config.database.url : config.database.host, e)
+			);
 		}
 	}
 
 	@Override
 	public void onDisable() {
-		// Plugin shutdown logic
+		pool.close();
 	}
 }

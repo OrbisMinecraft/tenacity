@@ -18,6 +18,9 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.*;
 
+/**
+ * Represents serialized player data.
+ */
 public class SerializedPlayer {
 	public static final Gson GSON = new Gson();
 
@@ -50,16 +53,43 @@ public class SerializedPlayer {
 		this.uuid = uuid;
 	}
 
-	private static ItemStack[] readInventory(String inventory) {
-		final List<Map<String, Object>> rawItems = GSON.fromJson(inventory, LIST_OF_OBJECTS);
+	/**
+	 * Parse a list of item stacks from JSON.
+	 *
+	 * @param json A JSON string to read the items from.
+	 * @return A list of item stacks.
+	 */
+	private static ItemStack[] loadItems(final @NotNull String json) {
+		final List<Map<String, Object>> rawItems = GSON.fromJson(json, LIST_OF_OBJECTS);
 		final ItemStack[] items = new ItemStack[rawItems.size()];
 
-		for (int i = 0; i < rawItems.size(); i++)
+		for (int i = 0; i < rawItems.size(); i++) {
 			items[i] = rawItems.get(i) != null ? ItemStack.deserialize(rawItems.get(i)) : null;
+		}
 
 		return items;
 	}
 
+	/**
+	 * Dump a list of items to JSON.
+	 *
+	 * @param items A list of items to dump.
+	 * @return The JSON representation of the items
+	 */
+	private static String dumpItems(final ItemStack[] items) {
+		final var itemsMap = new ArrayList<Map<String, Object>>();
+		for (final var item : items) itemsMap.add(item != null ? item.serialize() : null);
+		return GSON.toJson(itemsMap);
+	}
+
+	/**
+	 * Converts a {@link Player} object into a {@link SerializedPlayer} object, copying only the fields
+	 * defined in the given config.
+	 *
+	 * @param config The config to use when converting.
+	 * @param player The player to convert.
+	 * @return The serialized player created.
+	 */
 	public static SerializedPlayer fromPlayer(final @NotNull TenacityConfig.TenacitySavingConfig config,
 											  final @NotNull Player player) {
 		final var serial = new SerializedPlayer(player.getUniqueId());
@@ -99,54 +129,49 @@ public class SerializedPlayer {
 		if (config.inventory) {
 			final var inventory = player.getInventory();
 			serial.selectedSlot = inventory.getHeldItemSlot();
-
-			final var inventoryItems = new ArrayList<Map<String, Object>>();
-			for (final var item : inventory.getContents()) inventoryItems.add(item != null ? item.serialize() : null);
-
-			final var armorItems = new ArrayList<Map<String, Object>>();
-			for (final var item : inventory.getArmorContents()) armorItems.add(item != null ? item.serialize() : null);
-
-			final var echestItems = new ArrayList<Map<String, Object>>();
-			for (final var item : player.getEnderChest().getContents())
-				echestItems.add(item != null ? item.serialize() : null);
-
-			serial.inventory = GSON.toJson(inventoryItems);
-			serial.armorItems = GSON.toJson(armorItems);
-			serial.enderChest = GSON.toJson(echestItems);
+			serial.inventory = dumpItems(inventory.getContents());
+			serial.armorItems = dumpItems(inventory.getArmorContents());
+			serial.enderChest = GSON.toJson(player.getEnderChest().getContents());
 		}
 
 		return serial;
 	}
 
-	public static SerializedPlayer fromDatabase(final @NotNull ResultSet result) {
-		final SerializedPlayer serial;
-
-		try {
-			serial = new SerializedPlayer(UUID.fromString(result.getString("uuid")));
-			serial.air = result.getInt("air");
-			serial.fire = result.getInt("fire");
-			serial.glowing = result.getBoolean("glowing");
-			serial.health = result.getDouble("health");
-			serial.absorption = result.getDouble("absorption");
-			serial.activeEffects = result.getString("active_effects");
-			serial.recipeBook = result.getString("recipe_book");
-			serial.selectedSlot = result.getInt("selected_slot");
-			serial.foodLevel = result.getInt("food_level");
-			serial.foodExhaustion = result.getDouble("food_exhaustion");
-			serial.foodSaturation = result.getDouble("food_saturation");
-			serial.xpLevel = result.getInt("xp_level");
-			serial.xpPercentage = result.getDouble("xp_percentage");
-			serial.xpTotal = result.getInt("xp_total");
-			serial.inventory = result.getString("inventory");
-			serial.enderChest = result.getString("ender_chest");
-			serial.armorItems = result.getString("armor_items");
-		} catch (SQLException e) {
-			throw new RuntimeException(e);
-		}
-
+	/**
+	 * Loads a serialized player from a {@link ResultSet}. It is required that the result set have
+	 * all columns present.
+	 *
+	 * @param result The result set to query from.
+	 * @return The serialized player instance from the database.
+	 */
+	public static SerializedPlayer fromDatabase(final @NotNull ResultSet result) throws SQLException {
+		final var serial = new SerializedPlayer(UUID.fromString(result.getString("uuid")));
+		serial.air = result.getInt("air");
+		serial.fire = result.getInt("fire");
+		serial.glowing = result.getBoolean("glowing");
+		serial.health = result.getDouble("health");
+		serial.absorption = result.getDouble("absorption");
+		serial.activeEffects = result.getString("active_effects");
+		serial.recipeBook = result.getString("recipe_book");
+		serial.selectedSlot = result.getInt("selected_slot");
+		serial.foodLevel = result.getInt("food_level");
+		serial.foodExhaustion = result.getDouble("food_exhaustion");
+		serial.foodSaturation = result.getDouble("food_saturation");
+		serial.xpLevel = result.getInt("xp_level");
+		serial.xpPercentage = result.getDouble("xp_percentage");
+		serial.xpTotal = result.getInt("xp_total");
+		serial.inventory = result.getString("inventory");
+		serial.enderChest = result.getString("ender_chest");
+		serial.armorItems = result.getString("armor_items");
 		return serial;
 	}
 
+	/**
+	 * Apply the settings from this {@link SerializedPlayer} to the given {@link Player} object.
+	 *
+	 * @param config The configuration of which values to apply.
+	 * @param target The player to apply to.
+	 */
 	public void apply(final @NotNull TenacityConfig.TenacitySavingConfig config,
 					  final @NotNull Player target) {
 		if (config.health) {
@@ -181,16 +206,15 @@ public class SerializedPlayer {
 		}
 
 		if (config.inventory) {
-			final var contents = readInventory(inventory);
-			final var armor = readInventory(armorItems);
-			final var echest = readInventory(enderChest);
+			final var contents = loadItems(inventory);
+			final var armor = loadItems(armorItems);
+			final var echest = loadItems(enderChest);
 
 			target.getInventory().clear();
 			target.getInventory().setContents(contents);
 			target.getInventory().setArmorContents(armor);
 			target.getEnderChest().clear();
 			target.getEnderChest().setContents(echest);
-
 			target.getInventory().setHeldItemSlot(selectedSlot);
 		}
 	}
