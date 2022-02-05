@@ -30,7 +30,9 @@ public final class TenacityEventListener implements Listener {
 	public void onPlayerJoin(final @NotNull PlayerJoinEvent event) {
 		final var player = event.getPlayer();
 
-		plugin.withDatabase(conn -> {
+		// Delay fetching player data by 1 second. This should, hopefully, stop random data loss when
+		// switching between servers. TODO: Make sure the player can't interact with the inventory during this time!
+		plugin.getServer().getScheduler().scheduleSyncDelayedTask(plugin, () -> plugin.withDatabase(conn -> {
 			final var stmt = conn.prepareStatement("SELECT * FROM players WHERE uuid=?");
 			stmt.setString(1, player.getUniqueId().toString());
 
@@ -41,7 +43,7 @@ public final class TenacityEventListener implements Listener {
 			} else {
 				plugin.getLogger().info("Could not load player '%s' from the database because they joined for the first time".formatted(player.getName()));
 			}
-		});
+		}), 20);
 	}
 
 	/**
