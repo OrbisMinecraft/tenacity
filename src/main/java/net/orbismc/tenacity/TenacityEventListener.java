@@ -5,9 +5,13 @@
 package net.orbismc.tenacity;
 
 import net.orbismc.tenacity.serial.SerializedPlayer;
+import net.orbismc.tenacity.task.LoadPlayerTask;
+import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryPickupItemEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.jetbrains.annotations.NotNull;
@@ -24,30 +28,45 @@ public final class TenacityEventListener implements Listener {
 
 	/**
 	 * Handles a player joining the world. This will load the player data from the database.
+	 *
 	 * @param event The event to handle.
 	 */
 	@EventHandler(ignoreCancelled = true, priority = EventPriority.HIGHEST)
 	public void onPlayerJoin(final @NotNull PlayerJoinEvent event) {
 		final var player = event.getPlayer();
+		plugin.setLoaded(player, false);
+		plugin.getServer().getScheduler().scheduleSyncDelayedTask(plugin, new LoadPlayerTask(plugin, player.getUniqueId()), 20);
+	}
 
-		// Delay fetching player data by 1 second. This should, hopefully, stop random data loss when
-		// switching between servers. TODO: Make sure the player can't interact with the inventory during this time!
-		plugin.getServer().getScheduler().scheduleSyncDelayedTask(plugin, () -> plugin.withDatabase(conn -> {
-			final var stmt = conn.prepareStatement("SELECT * FROM players WHERE uuid=?");
-			stmt.setString(1, player.getUniqueId().toString());
+	/**
+	 * Makes sure that players whose inventories haven't loaded in yet can't actually interact with theirs.
+	 *
+	 * @param event The event to handle.
+	 */
+	@EventHandler(ignoreCancelled = true, priority = EventPriority.HIGHEST)
+	public void onInventoryClick(final @NotNull InventoryClickEvent event) {
+		if (!(event.getWhoClicked() instanceof final Player player)) return;
 
-			final var result = stmt.executeQuery();
-			if (result.next()) {
-				SerializedPlayer.fromDatabase(result).apply(plugin.config.saving, player);
-				plugin.getLogger().info("Loaded data of player '%s' from the database successfully".formatted(player.getName()));
-			} else {
-				plugin.getLogger().info("Could not load player '%s' from the database because they joined for the first time".formatted(player.getName()));
-			}
-		}), 20);
+		// If the player is not loaded yet, don't allow inventory clicks
+		if (!plugin.isLoaded(player)) event.setCancelled(true);
+	}
+
+	/**
+	 * Makes sure that players whose inventories haven't loaded in yet can't actually pick up items.
+	 *
+	 * @param event The event to handle.
+	 */
+	@EventHandler(ignoreCancelled = true, priority = EventPriority.HIGHEST)
+	public void onPickupItem(final @NotNull InventoryPickupItemEvent event) {
+		if (!(event.getInventory().getHolder() instanceof final Player player)) return;
+
+		// If the player is not loaded yet, don't allow picking up items
+		if (!plugin.isLoaded(player)) event.setCancelled(true);
 	}
 
 	/**
 	 * Handles a player leaving the world. This will save the player data to the database.
+	 *
 	 * @param event The event to handle.
 	 */
 	@EventHandler(ignoreCancelled = true, priority = EventPriority.HIGHEST)
@@ -59,7 +78,7 @@ public final class TenacityEventListener implements Listener {
 			final var stmt = conn.prepareStatement("REPLACE INTO players (uuid, " +
 					"air, fire, glowing, health, absorption, active_effects, recipe_book, food_level, " +
 					"food_exhaustion, food_saturation, xp_level, xp_percentage, xp_total, inventory, " +
-					"ender_chest, armor_items, selected_slot) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+					"ender_chest, armor_items, selected_slot, last_event) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 			stmt.setString(1, serial.uuid.toString());
 			stmt.setInt(2, serial.air);
 			stmt.setInt(3, serial.fire);
@@ -78,7 +97,10 @@ public final class TenacityEventListener implements Listener {
 			stmt.setString(16, serial.enderChest);
 			stmt.setString(17, serial.armorItems);
 			stmt.setInt(18, serial.selectedSlot);
+			stmt.setString(19, "save");
 			stmt.executeUpdate();
+
+			plugin.getLogger().info("Saved player data of '%s' to the database successfully.".formatted(player.getName()));
 		});
 	}
 }

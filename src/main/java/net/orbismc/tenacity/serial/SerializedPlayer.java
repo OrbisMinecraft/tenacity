@@ -19,7 +19,7 @@ import java.sql.SQLException;
 import java.util.*;
 
 /**
- * Represents serialized player data.
+ * Represents serialized player data. TODO: Also save achievements
  */
 public class SerializedPlayer {
 	public static final Gson GSON = new Gson();

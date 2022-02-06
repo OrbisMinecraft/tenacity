@@ -22,5 +22,7 @@ CREATE TABLE IF NOT EXISTS players
     inventory       TEXT,
     ender_chest     TEXT,
     armor_items     TEXT,
-    selected_slot   INTEGER
+    selected_slot   INTEGER,
+
+    last_event      VARCHAR(16)
 );
